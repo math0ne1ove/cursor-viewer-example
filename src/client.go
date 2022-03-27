@@ -92,7 +92,7 @@ func (c *Client) readPump() {
 		}
 		broadcastMsg.SessionId = c.id
 
-		message , err = json.Marshal(broadcastMsg)
+		message, err = json.Marshal(broadcastMsg)
 		if err != nil {
 			return
 		}
@@ -162,12 +162,11 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.writePump()
 	go client.readPump()
 
-	time.Sleep(time.Second)
-	go initMessages(hub, client)
+	go initMessages(hub)
 
 }
 
-func initMessages(hub *Hub, client *Client) {
+func initMessages(hub *Hub) {
 	method := "move"
 	for session, cord := range hub.coords.Items() {
 		sId, err := strconv.Atoi(session)
@@ -182,9 +181,7 @@ func initMessages(hub *Hub, client *Client) {
 		}
 
 		if send, err := json.Marshal(Msg{Method: &method, SessionId: sId, X: X, Y: Y, init: true}); err == nil {
-			if _, ok := <- client.send; ok {
-				client.send <- send
-			}
+			hub.broadcast <- send
 		}
 	}
 }
