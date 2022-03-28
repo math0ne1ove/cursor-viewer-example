@@ -3,8 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-
-	cmap "github.com/orcaman/concurrent-map"
+	"sync"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to the
@@ -26,9 +25,53 @@ type Hub struct {
 	// Unregister requests from clients.
 	unregister chan *Client
 
-	coords cmap.ConcurrentMap
+	coords ConcurrentMap
 
 	coordinateUpdate chan []byte
+}
+
+type ConcurrentMap struct {
+	items map[string]interface{}
+	sync.RWMutex
+}
+
+func NewMap() ConcurrentMap {
+	items := make(map[string]interface{})
+	return ConcurrentMap{
+		items:   items,
+		RWMutex: sync.RWMutex{},
+	}
+}
+
+func (m *ConcurrentMap) Set(key string, value interface{}) {
+	m.Lock()
+	m.items[key] = value
+	m.Unlock()
+}
+
+func (m *ConcurrentMap) Get(key string) (interface{}, bool) {
+	m.RLock()
+	val, ok := m.items[key]
+	m.RUnlock()
+	return val, ok
+}
+
+func (m *ConcurrentMap) Remove(key string) {
+	m.Lock()
+	delete(m.items, key)
+	m.Unlock()
+}
+
+func (m *ConcurrentMap) Items() map[string]interface{} {
+	tmp := make(map[string]interface{})
+
+	m.RLock()
+	for key, valuve := range m.items {
+		tmp[key] = valuve
+	}
+	m.RUnlock()
+
+	return tmp
 }
 
 type Coords struct {
@@ -46,7 +89,7 @@ type Msg struct {
 
 func newHub() *Hub {
 	return &Hub{
-		coords:           cmap.New(),
+		coords:           NewMap(),
 		coordinateUpdate: make(chan []byte, 10),
 		broadcast:        make(chan []byte),
 		init:             make(chan []byte),
